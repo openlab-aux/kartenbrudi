@@ -1,0 +1,177 @@
+openapi: 3.0.0
+info:
+  title: Kartenbrudi API
+  description: |
+    API for managing access control cards
+  version: 0.1.0
+servers:
+  - url: https://staging.kartenbrudi.lab.weltraumpflege.org/api/v1
+    description: Staging Server
+  - url: https://kartenbrudi.lab.weltraumpflege.org/api/v1
+    description: Prod Server
+
+tags:
+  - name: Admin
+    description: Admin Operations
+  - name: Package
+    description: Package Operations
+
+paths:
+  /cards/{hash}:
+    delete:
+      summary: Unregister card
+      tags: ['Admin']
+      parameters:
+        - in: path
+          name: hash
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+      responses:
+        '204':
+          description: Card unregistered
+        '404':
+          description: Card not found
+          content:
+            application/json:  
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    put:
+      summary: Update card metadata
+      tags: ['Admin']
+      parameters:
+        - in: path
+          name: hash
+          schema:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+      requestBody:
+        description: Card Metadata (hash can't be updated)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardUpdateReferenceRequest'
+      responses:
+        '204':
+          description: Card metadata has been updated successfully
+        '404':
+          description: Card not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /cards:
+    post:
+      summary: Add card
+      tags: ['Admin']
+      requestBody:
+        description: Card Details
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardDetails'  
+      responses:
+        '201':
+          description: Card has been registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardDetails'
+        '409':
+          description: Card with this hash is already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
+    get:
+      summary: List active cards
+      tags: ['Admin']
+      responses:
+        '200':
+          description: List of active cards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cards:
+                    type: array
+                    items:
+                      type: object
+                      $ref: '#/components/schemas/CardDetails'
+          
+  /package:
+    head:
+      summary: Returns headers including ETags for package file
+      tags: ['Package']
+      responses:
+        '200':
+          description: Successful response
+          headers: 
+            ETag:
+              description: sha256 hash of the package file
+              schema:
+                type: string
+    get:
+      summary: Returns a text file containing valid card ID hashes
+      tags: ['Package']
+      responses:
+        '200':
+          description: |
+            Text file containing valid hashes of Card ID, separated by
+            newline characters
+          content:
+            text/plain:
+              schema:
+                type: string
+          headers: 
+            ETag:
+              description: sha256 hash of the package file
+              schema:
+                type: string
+  
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      description: |
+        use only for machine interactions, e.g. Provisioning tool or
+        Reader firmware.
+      in: header
+      name: "X-KARTENBRUDI-API-KEY"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+    CardDetails:
+      type: object  
+      properties:
+        reference:
+          type: string
+          example: "member_id:1337"
+        hash:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+          example: "c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2"
+    CardUpdateReferenceRequest:
+      type: object
+      properties:
+        reference:
+          type: string
+
+security:
+  - ApiKeyAuth: []
